@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # https://github.com/spro/char-rnn.pytorch
 
+import time
 import random
+import string
 
 import torch
 import torch.nn as nn
@@ -31,12 +33,6 @@ def parse_args():
     argparser.add_argument('--shuffle', action='store_true')
     argparser.add_argument('--cuda', action='store_true')
     return argparser.parse_args()
-
-args = parse_args()
-if args.cuda:
-    print("Using CUDA")
-
-file, file_len = read_file(args.filename)
 
 
 def random_training_set(chunk_len, batch_size):
@@ -79,40 +75,46 @@ def save():
     print('Saved as %s' % save_filename)
 
 
-# Initialize models and start training
+if __name__ == "__main__":
+    args = parse_args()
+    if args.cuda:
+        print("Using CUDA")
 
-decoder = CharRNN(
-    n_characters,
-    args.hidden_size,
-    n_characters,
-    model=args.model,
-    n_layers=args.n_layers,
-)
+    file, file_len = read_file(args.filename)
 
-decoder_optimizer = torch.optim.Adam(decoder.parameters(), lr=args.learning_rate)
-criterion = nn.CrossEntropyLoss()
+    n_characters = len(string.printable)
 
-if args.cuda:
-    decoder.cuda()
+    decoder = CharRNN(
+        n_characters,
+        args.hidden_size,
+        n_characters,
+        model=args.model,
+        n_layers=args.n_layers,
+    )
 
-start = time.time()
-all_losses = []
-loss_avg = 0
+    decoder_optimizer = torch.optim.Adam(decoder.parameters(), lr=args.learning_rate)
+    criterion = nn.CrossEntropyLoss()
 
-try:
-    print("Training for %d epochs..." % args.n_epochs)
-    for epoch in tqdm(range(1, args.n_epochs + 1)):
-        loss = train(*random_training_set(args.chunk_len, args.batch_size))
-        loss_avg += loss
+    if args.cuda:
+        decoder.cuda()
 
-        if epoch % args.print_every == 0:
-            print('[%s (%d %d%%) %.4f]' % (time_since(start), epoch, epoch / args.n_epochs * 100, loss))
-            print(generate(decoder, 'Wh', 100, cuda=args.cuda), '\n')
+    start = time.time()
+    all_losses = []
+    loss_avg = 0
 
-    print("Saving...")
-    save()
+    try:
+        print("Training for %d epochs..." % args.n_epochs)
+        for epoch in tqdm(range(1, args.n_epochs + 1)):
+            loss = train(*random_training_set(args.chunk_len, args.batch_size))
+            loss_avg += loss
 
-except KeyboardInterrupt:
-    print("Saving before quit...")
-    save()
+            if epoch % args.print_every == 0:
+                print('[%s (%d %d%%) %.4f]' % (time_since(start), epoch, epoch / args.n_epochs * 100, loss))
+                print(generate(decoder, 'Wh', 100, cuda=args.cuda), '\n')
 
+        print("Saving...")
+        save()
+
+    except KeyboardInterrupt:
+        print("Saving before quit...")
+        save()
