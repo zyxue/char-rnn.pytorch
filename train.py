@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # https://github.com/spro/char-rnn.pytorch
 
+import random
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -9,9 +11,9 @@ import os
 
 from tqdm import tqdm
 
-from helpers import *
-from model import *
-from generate import *
+from helpers import read_file, char_tensor, time_since
+from model import CharRNN
+from generate import generate
 
 
 def parse_args():
@@ -36,6 +38,7 @@ if args.cuda:
 
 file, file_len = read_file(args.filename)
 
+
 def random_training_set(chunk_len, batch_size):
     inp = torch.LongTensor(batch_size, chunk_len)
     target = torch.LongTensor(batch_size, chunk_len)
@@ -52,6 +55,7 @@ def random_training_set(chunk_len, batch_size):
         target = target.cuda()
     return inp, target
 
+
 def train(inp, target):
     hidden = decoder.init_hidden(args.batch_size)
     if args.cuda:
@@ -60,18 +64,20 @@ def train(inp, target):
     loss = 0
 
     for c in range(args.chunk_len):
-        output, hidden = decoder(inp[:,c], hidden)
-        loss += criterion(output.view(args.batch_size, -1), target[:,c])
+        output, hidden = decoder(inp[:, c], hidden)
+        loss += criterion(output.view(args.batch_size, -1), target[:, c])
 
     loss.backward()
     decoder_optimizer.step()
 
     return loss.item() / args.chunk_len
 
+
 def save():
     save_filename = os.path.splitext(os.path.basename(args.filename))[0] + '.pt'
     torch.save(decoder, save_filename)
     print('Saved as %s' % save_filename)
+
 
 # Initialize models and start training
 
@@ -82,6 +88,7 @@ decoder = CharRNN(
     model=args.model,
     n_layers=args.n_layers,
 )
+
 decoder_optimizer = torch.optim.Adam(decoder.parameters(), lr=args.learning_rate)
 criterion = nn.CrossEntropyLoss()
 
